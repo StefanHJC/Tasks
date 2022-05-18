@@ -1,3 +1,3 @@
-int iArmySize = 10;
-int coinsNumber = 10;
-string strName = "Vladislav";
+int unitsInArmy = 10;
+int coins = 10;
+string userName = "Vladislav";
