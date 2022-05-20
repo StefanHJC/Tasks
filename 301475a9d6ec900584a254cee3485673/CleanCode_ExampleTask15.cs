@@ -1,7 +1,7 @@
-class PlayerData { }
-class GunController { }
-class FollowTarget { }
-class GetUnit
+class Player { }
+class Gun { }
+class Target { }
+class Units
 {
-    public IReadOnlyCollection<Unit> UnitsToGet {get; private set;}
+    public IReadOnlyCollection<Unit> Collection {get; private set;}
 }
