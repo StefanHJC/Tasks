@@ -1,45 +1,100 @@
-private void checkButton_Click(object sender, EventArgs e)
+public class CheckButton
+{
+    private MessageBox _outputMessageBox;
+    private MessageBox _passportTextBox;
+    private DatabaseController _databaseController;
+
+    public void OnClick()
     {
-      if (this.passportTextbox.Text.Trim() == "")
-      {
-        int num1 = (int) MessageBox.Show("Введите серию и номер паспорта");
-      }
-      else
-      {
-        string rawData = this.passportTextbox.Text.Trim().Replace(" ", string.Empty);
-        if (rawData.Length < 10)
+        string result;
+
+        if (_passportTextBox.Text.Trim() == "")
         {
-          this.textResult.Text = "Неверный формат серии или номера паспорта";
+            _outputMessageBox.Show("Введите серию и номер паспорта");
+
+            return;
         }
+        string userInput = GetUserInput();
+
+        if (ValidatePassport(userInput) == false)
+        {
+            _outputMessageBox.Text = "Неверный формат серии или номера паспорта";
+            
+            return;
+        }
+        string sqlRequest = GenerateSQLRequest(userInput);
+        _databaseController.TryCreateSQLiteConnection("db.sqlite");
+        DataTable dataTable = _databaseController.GetDataTableAndCloseConnection(sqlRequest);
+
+        if (dataTable == null)
+        {
+            _outputMessageBox.Text = $"Паспорт «{userInput}» в списке участников дистанционного голосования НЕ НАЙДЕН";
+
+            return;
+        }
+        if (CheckAccessByPassport(dataTable))
+            result = "ПРЕДОСТАВЛЕН";
         else
-        {
-          string commandText = string.Format("select * from passports where num='{0}' limit 1;", (object) Form1.ComputeSha256Hash(rawData));
-          string connectionString = string.Format("Data Source=" + Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) + "\\db.sqlite");
-          try
-          {
-            SQLiteConnection connection = new SQLiteConnection(connectionString);
-            connection.Open();
-            SQLiteDataAdapter sqLiteDataAdapter = new SQLiteDataAdapter(new SQLiteCommand(commandText, connection));
-            DataTable dataTable1 = new DataTable();
-            DataTable dataTable2 = dataTable1;
-            sqLiteDataAdapter.Fill(dataTable2);
-            if (dataTable1.Rows.Count > 0)
-            {
-              if (Convert.ToBoolean(dataTable1.Rows[0].ItemArray[1]))
-                this.textResult.Text = "По паспорту «" + this.passportTextbox.Text + "» доступ к бюллетеню на дистанционном электронном голосовании ПРЕДОСТАВЛЕН";
-              else
-                this.textResult.Text = "По паспорту «" + this.passportTextbox.Text + "» доступ к бюллетеню на дистанционном электронном голосовании НЕ ПРЕДОСТАВЛЯЛСЯ";
-            }
-            else
-              this.textResult.Text = "Паспорт «" + this.passportTextbox.Text + "» в списке участников дистанционного голосования НЕ НАЙДЕН";
-            connection.Close();
-          }
-          catch (SQLiteException ex)
-          {
-            if (ex.ErrorCode != 1)
-              return;
-            int num2 = (int) MessageBox.Show("Файл db.sqlite не найден. Положите файл в папку вместе с exe.");
-          }
-        }
-      }
+            result = "НЕ ПРЕДОСТАВЛЕН";
+
+        _outputMessageBox.Text = $"По паспорту «{userInput}» доступ к биллютеню на дистанционном электронном голосовании {result}"
     }
+
+    private bool ValidatePassport(string userInput)
+    {
+        int minLength = 10;
+
+        return userInput.Length < minLength ? false : true;
+    }
+
+    private string GetUserInput() => _passportTextbox.Text.Trim().Replace(" ", string.Empty);
+
+    private bool CheckAccessByPassport(DataTable dataTable) => Convert.ToBoolean(dataTable.Rows[0].ItemArray[1]) ? true : false;
+
+    private string GenerateSQLRequest(string passportNum) => string.Format($"select * from passports where num='{passportNum}' limit 1;", (object)Form1.ComputeSha256Hash(rawData));
+}
+
+public class DatabaseController
+{
+    private SQLiteConnection _activeConnection;
+
+    public bool TryCreateSQLiteConnection(string dbName)
+    {
+        try
+        {
+            string connectionString = GenerateSQLiteConnectionString(dbName);
+            var connection = new SQLiteConnection(connectionString);
+            var sqLiteDataAdapter = new SQLiteDataAdapter(new SQLiteCommand(connectionString, connection));
+
+            connection.Open();
+            _activeConnection = connection;
+
+            return true;
+        }
+        catch (SQLiteException exception)
+        {
+            if (exception.ErrorCode != 1)
+                return false;
+
+            MessageBox.Show($"Файл {dbName} не найден. Положите файл в папку вместе с exe.");
+
+            return false;
+        }
+    }
+
+    public DataTable GetDataTableAndCloseConnection(string sqLiteCommand)
+    {
+        var dataTable = new DataTable();
+        var sqLiteDataAdapter = new SQLiteDataAdapter(new SQLiteCommand(sqLiteCommand, connection));
+
+        sqLiteDataAdapter.Fill(dataTable);
+        _activeConnection.Close();
+
+        if (dataTable.Columns.Count == 0)
+            return null;
+
+        return dataTable;
+    }
+
+    private string GenerateSQLiteConnectionString(string dbName) => string.Format($"Data Source={Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)}\\{dbName}");
+}
