@@ -1,13 +1,16 @@
-public void SetEnable(bool enable)
+public class Example
 {
-   _enable = enable;
-   
-   if(_enable)
-   {
-      _effects.StartEnableAnimation();
-   }
-   else
-   {
-      _pool.Free(this);
-   }
+    private bool _isEnabled;
+
+    public void SetEnabled() => _isEnabled = true;
+
+    public void SetDisabled() => _isEnabled = false;
+
+    private void Update()
+    {
+        if (_isEnabled)
+            _effects.StartEnableAnimation();
+        else
+            _pool.Free(this);
+    }
 }
